@@ -1,0 +1,245 @@
+{% extends "base.html" %}
+
+{% block title %}通報整理 | 防災アプリ{% endblock %}
+
+{% block content %}
+<style>
+    .page-shell:has(.report-workspace) {
+        width: min(1120px, calc(100% - 32px));
+    }
+
+    .report-heading {
+        margin: 0 0 8px;
+        color: #26384b;
+        font-size: 25px;
+    }
+
+    .report-intro {
+        margin: 0 0 22px;
+        color: #66768a;
+        font-size: 14px;
+        line-height: 1.7;
+    }
+
+    .sr-only {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        overflow: hidden;
+        clip: rect(0, 0, 0, 0);
+        white-space: nowrap;
+    }
+
+    .report-workspace {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+        gap: 18px;
+        align-items: stretch;
+    }
+
+    .report-panel {
+        min-width: 0;
+        padding: 20px;
+        border: 1px solid #dfe6ed;
+        border-radius: 8px;
+        background: #fff;
+        box-shadow: 0 5px 18px rgba(36, 55, 74, .06);
+    }
+
+    .report-panel-heading {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        margin: 0 0 14px;
+        color: #26384b;
+        font-size: 17px;
+    }
+
+    .report-panel-heading i {
+        margin-right: 8px;
+        color: #267b79;
+    }
+
+    .transcript-input {
+        width: 100%;
+        min-height: 360px;
+        padding: 13px;
+        resize: vertical;
+        border: 1px solid #cbd5df;
+        border-radius: 5px;
+        color: #26384b;
+        background: #fcfdfd;
+        font: inherit;
+        font-size: 14px;
+        line-height: 1.7;
+    }
+
+    .transcript-input:focus-visible {
+        outline: 3px solid rgba(38, 123, 121, .18);
+        border-color: #267b79;
+    }
+
+    .report-actions {
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 10px;
+        margin-top: 13px;
+    }
+
+    .report-button {
+        min-height: 40px;
+        padding: 0 15px;
+        border: 1px solid #267b79;
+        border-radius: 5px;
+        color: #fff;
+        background: #267b79;
+        font: inherit;
+        font-size: 14px;
+        font-weight: 700;
+        cursor: pointer;
+    }
+
+    .report-button:hover {
+        background: #1e6866;
+    }
+
+    .report-button:disabled {
+        opacity: .65;
+        cursor: wait;
+    }
+
+    .report-button.secondary {
+        border-color: #d4dce4;
+        color: #415367;
+        background: #fff;
+    }
+
+    .report-button.secondary:hover {
+        background: #f2f5f7;
+    }
+
+    .report-status {
+        min-height: 20px;
+        margin: 0;
+        color: #66768a;
+        font-size: 13px;
+    }
+
+    .result-output {
+        min-height: 360px;
+        max-height: 560px;
+        overflow: auto;
+        margin: 0;
+        padding: 14px;
+        border-radius: 5px;
+        color: #e7f0ee;
+        background: #203334;
+        font: 13px/1.7 ui-monospace, SFMono-Regular, Consolas, monospace;
+        white-space: pre-wrap;
+        overflow-wrap: anywhere;
+    }
+
+    .result-placeholder {
+        color: #c3d0cd;
+    }
+
+    @media (max-width: 760px) {
+        .report-workspace {
+            grid-template-columns: minmax(0, 1fr);
+        }
+
+        .report-heading {
+            font-size: 22px;
+        }
+
+        .report-panel {
+            padding: 16px;
+        }
+
+        .transcript-input,
+        .result-output {
+            min-height: 280px;
+        }
+    }
+</style>
+
+<h1 class="report-heading">災害通報の整理</h1>
+<p class="report-intro">自動文字起こしを入力すると、キーワードに基づく一次抽出結果をJSON形式で表示します。日時や安全状況など、明記されていない情報は補完せず「不明」とします。</p>
+
+<div class="report-workspace">
+    <section class="report-panel" aria-labelledby="transcriptHeading">
+        <h2 class="report-panel-heading" id="transcriptHeading"><span><i class="fa-solid fa-phone-volume" aria-hidden="true"></i>文字起こし</span></h2>
+        <label class="sr-only" for="transcriptInput">電話通報の自動文字起こし</label>
+        <textarea class="transcript-input" id="transcriptInput" placeholder="電話通報の自動文字起こしを貼り付けてください。"></textarea>
+        <div class="report-actions">
+            <button class="report-button" id="extractButton" type="button"><i class="fa-solid fa-wand-magic-sparkles" aria-hidden="true"></i> 抽出する</button>
+            <button class="report-button secondary" id="clearButton" type="button"><i class="fa-solid fa-eraser" aria-hidden="true"></i> クリア</button>
+            <p class="report-status" id="reportStatus" role="status" aria-live="polite"></p>
+        </div>
+    </section>
+
+    <section class="report-panel" aria-labelledby="resultHeading">
+        <h2 class="report-panel-heading" id="resultHeading">
+            <span><i class="fa-solid fa-list-check" aria-hidden="true"></i>抽出結果</span>
+            <button class="report-button secondary" id="copyButton" type="button" aria-label="抽出結果をコピー" title="抽出結果をコピー" disabled><i class="fa-regular fa-copy" aria-hidden="true"></i></button>
+        </h2>
+        <pre class="result-output" id="resultOutput"><span class="result-placeholder">抽出結果はここに表示されます。</span></pre>
+    </section>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const transcriptInput = document.getElementById('transcriptInput');
+    const extractButton = document.getElementById('extractButton');
+    const clearButton = document.getElementById('clearButton');
+    const copyButton = document.getElementById('copyButton');
+    const resultOutput = document.getElementById('resultOutput');
+    const reportStatus = document.getElementById('reportStatus');
+
+    extractButton.addEventListener('click', async function() {
+        const transcript = transcriptInput.value.trim();
+        if (!transcript) {
+            reportStatus.textContent = '文字起こしを入力してください。';
+            transcriptInput.focus();
+            return;
+        }
+
+        extractButton.disabled = true;
+        reportStatus.textContent = '抽出しています...';
+        try {
+            const response = await fetch('/api/extract_report', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ transcript: transcript })
+            });
+            if (!response.ok) {
+                throw new Error('抽出に失敗しました。');
+            }
+            const result = await response.json();
+            resultOutput.textContent = JSON.stringify(result, null, 2);
+            copyButton.disabled = false;
+            reportStatus.textContent = '抽出結果を更新しました。内容を確認してください。';
+        } catch (error) {
+            reportStatus.textContent = error.message || '抽出に失敗しました。';
+        } finally {
+            extractButton.disabled = false;
+        }
+    });
+
+    clearButton.addEventListener('click', function() {
+        transcriptInput.value = '';
+        resultOutput.innerHTML = '<span class="result-placeholder">抽出結果はここに表示されます。</span>';
+        copyButton.disabled = true;
+        reportStatus.textContent = '';
+        transcriptInput.focus();
+    });
+
+    copyButton.addEventListener('click', async function() {
+        await navigator.clipboard.writeText(resultOutput.textContent);
+        reportStatus.textContent = '抽出結果をコピーしました。';
+    });
+});
+</script>
+{% endblock %}

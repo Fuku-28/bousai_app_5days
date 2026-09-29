@@ -1,0 +1,1335 @@
+{% extends "base.html" %}
+
+{% block title %}災害通報一覧 | 防災アプリ{% endblock %}
+
+{% block content %}
+<style>
+    .page-shell:has(.report-dashboard) {
+        width: min(1380px, calc(100% - 40px));
+        padding-top: 20px;
+    }
+
+    .report-dashboard {
+        --line: #d9e0e6;
+        --muted: #617080;
+        --ink: #263543;
+        --teal: #176d69;
+        color: var(--ink);
+    }
+
+    .dashboard-heading {
+        display: flex;
+        align-items: flex-end;
+        justify-content: space-between;
+        gap: 16px;
+        margin-bottom: 14px;
+    }
+
+    .dashboard-heading h1 {
+        margin: 0;
+        font-size: 23px;
+        line-height: 1.3;
+    }
+
+    .dashboard-heading p {
+        margin: 5px 0 0;
+        color: var(--muted);
+        font-size: 13px;
+    }
+
+    .feed-status {
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        flex: 0 0 auto;
+        color: #536271;
+        font-size: 12px;
+    }
+
+    .feed-status::before {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: #25836d;
+        content: "";
+    }
+
+    .intake-drawer {
+        margin-bottom: 14px;
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        background: #fff;
+    }
+
+    .intake-drawer summary {
+        padding: 12px 15px;
+        color: #215b58;
+        font-size: 14px;
+        font-weight: 700;
+        cursor: pointer;
+    }
+
+    .intake-form {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 12px;
+        align-items: end;
+        padding: 0 15px 15px;
+    }
+
+    .intake-form label,
+    .filter-field label {
+        display: block;
+        margin-bottom: 5px;
+        color: #495969;
+        font-size: 12px;
+        font-weight: 700;
+    }
+
+    .intake-form textarea {
+        display: block;
+        width: 100%;
+        min-height: 100px;
+        padding: 10px;
+        resize: vertical;
+        border: 1px solid #c7d0d8;
+        border-radius: 4px;
+        color: var(--ink);
+        font: inherit;
+        font-size: 13px;
+        line-height: 1.6;
+    }
+
+    .dashboard-button,
+    .filter-control {
+        min-height: 38px;
+        border: 1px solid #c7d0d8;
+        border-radius: 4px;
+        color: #344453;
+        background: #fff;
+        font: inherit;
+        font-size: 13px;
+    }
+
+    .dashboard-button {
+        padding: 0 13px;
+        font-weight: 700;
+        cursor: pointer;
+    }
+
+    .dashboard-button.primary {
+        border-color: #176d69;
+        color: #fff;
+        background: #176d69;
+    }
+
+    .dashboard-button.primary:hover {
+        background: #105a56;
+    }
+
+    .dashboard-button:disabled {
+        opacity: .55;
+        cursor: wait;
+    }
+
+    .dashboard-button:focus-visible,
+    .filter-control:focus-visible,
+    .report-row:focus-visible {
+        outline: 3px solid rgba(23, 109, 105, .2);
+        outline-offset: 1px;
+    }
+
+    .summary-grid {
+        display: grid;
+        grid-template-columns: repeat(6, minmax(0, 1fr));
+        gap: 9px;
+        margin-bottom: 14px;
+    }
+
+    .summary-tile {
+        min-width: 0;
+        padding: 12px 14px;
+        border: 1px solid var(--line);
+        border-top: 3px solid #81909d;
+        border-radius: 5px;
+        background: #fff;
+    }
+
+    .summary-tile[data-tone="red"] { border-top-color: #b5403a; }
+    .summary-tile[data-tone="amber"] { border-top-color: #a96912; }
+    .summary-tile[data-tone="teal"] { border-top-color: #176d69; }
+
+    .summary-label {
+        display: block;
+        overflow: hidden;
+        color: var(--muted);
+        font-size: 12px;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .summary-value {
+        display: block;
+        margin-top: 3px;
+        color: #213241;
+        font-size: 25px;
+        font-weight: 700;
+        line-height: 1.15;
+        font-variant-numeric: tabular-nums;
+    }
+
+    .filter-bar {
+        display: grid;
+        grid-template-columns: minmax(170px, 1.3fr) minmax(130px, .9fr) minmax(130px, .8fr) minmax(140px, .8fr) auto auto;
+        gap: 10px;
+        align-items: end;
+        margin-bottom: 12px;
+        padding: 12px;
+        border: 1px solid var(--line);
+        border-radius: 5px;
+        background: #f8fafb;
+    }
+
+    .filter-control {
+        width: 100%;
+        padding: 0 9px;
+    }
+
+    .filter-check {
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        min-height: 38px;
+        color: #3c4b59;
+        font-size: 12px;
+        white-space: nowrap;
+    }
+
+    .filter-check input {
+        width: 16px;
+        height: 16px;
+        margin: 0;
+        accent-color: #176d69;
+    }
+
+    .filter-count {
+        margin: 0 0 10px;
+        color: var(--muted);
+        font-size: 12px;
+    }
+
+    .report-layout {
+        display: grid;
+        grid-template-columns: minmax(340px, .88fr) minmax(0, 1.55fr);
+        gap: 16px;
+        align-items: start;
+    }
+
+    .list-pane,
+    .detail-pane {
+        min-width: 0;
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        background: #fff;
+    }
+
+    .pane-heading {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        min-height: 46px;
+        padding: 0 14px;
+        border-bottom: 1px solid var(--line);
+    }
+
+    .pane-heading h2 {
+        margin: 0;
+        font-size: 14px;
+    }
+
+    .pane-heading small {
+        color: var(--muted);
+        font-size: 11px;
+    }
+
+    .report-list {
+        max-height: calc(100vh - 335px);
+        min-height: 220px;
+        overflow: auto;
+    }
+
+    .report-row {
+        display: block;
+        width: 100%;
+        padding: 12px 13px;
+        border: 0;
+        border-bottom: 1px solid #e8edf0;
+        border-left: 4px solid transparent;
+        color: inherit;
+        background: #fff;
+        text-align: left;
+        cursor: pointer;
+    }
+
+    .report-row:hover { background: #f6f9fa; }
+    .report-row[aria-pressed="true"] {
+        border-left-color: #176d69;
+        background: #eaf3f2;
+    }
+
+    .row-topline,
+    .row-badges {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 6px 8px;
+    }
+
+    .row-topline {
+        justify-content: space-between;
+        margin-bottom: 5px;
+    }
+
+    .row-time {
+        color: #566575;
+        font-size: 11px;
+        font-variant-numeric: tabular-nums;
+    }
+
+    .row-location {
+        display: block;
+        overflow: hidden;
+        margin-bottom: 3px;
+        color: #203342;
+        font-size: 15px;
+        font-weight: 700;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .row-summary {
+        display: -webkit-box;
+        overflow: hidden;
+        margin: 0 0 8px;
+        color: #485866;
+        font-size: 12px;
+        line-height: 1.5;
+        -webkit-box-orient: vertical;
+        -webkit-line-clamp: 2;
+    }
+
+    .status-badge,
+    .urgency-badge,
+    .rescue-badge,
+    .related-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        min-height: 22px;
+        padding: 2px 7px;
+        border: 1px solid #d7dfe4;
+        border-radius: 3px;
+        color: #445260;
+        background: #f4f6f7;
+        font-size: 11px;
+        font-weight: 700;
+        line-height: 1.2;
+    }
+
+    .urgency-badge[data-level="高"] { border-color: #dba9a5; color: #8f2925; background: #faedec; }
+    .urgency-badge[data-level="中"] { border-color: #e3c58f; color: #80500e; background: #fbf4e7; }
+    .urgency-badge[data-level="低"] { border-color: #b6d2c3; color: #2f684a; background: #edf5f0; }
+    .urgency-badge[data-level="要確認"] { border-color: #c7d0d8; color: #4e5a66; background: #f1f3f5; }
+    .rescue-badge[data-active="true"] { border-color: #dba9a5; color: #8f2925; background: #faedec; }
+    .related-badge { border-color: #c0d8d5; color: #245d59; background: #edf6f5; }
+
+    .empty-list {
+        padding: 30px 16px;
+        color: var(--muted);
+        font-size: 13px;
+        text-align: center;
+    }
+
+    .detail-content {
+        padding: 16px;
+    }
+
+    .detail-hazard {
+        margin: 0;
+        color: #263543;
+        font-size: 25px;
+        line-height: 1.25;
+    }
+
+    .detail-place {
+        margin: 5px 0 0;
+        color: #1f303e;
+        font-size: 18px;
+        font-weight: 700;
+    }
+
+    .critical-callouts {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 9px;
+        margin: 13px 0;
+    }
+
+    .critical-callout {
+        min-width: 0;
+        padding: 10px 12px;
+        border: 1px solid #d7dfe4;
+        border-left: 4px solid #82909b;
+        border-radius: 4px;
+        color: #364653;
+        background: #f7f9fa;
+    }
+
+    .critical-callout[data-alert="true"] {
+        border-color: #dba9a5;
+        border-left-color: #ae3832;
+        color: #742a26;
+        background: #fcf0ef;
+    }
+
+    .critical-callout[data-review="true"] {
+        border-color: #e3c58f;
+        border-left-color: #a96912;
+        color: #744d18;
+        background: #fbf5e9;
+    }
+
+    .callout-label {
+        display: block;
+        margin-bottom: 3px;
+        font-size: 11px;
+        font-weight: 700;
+    }
+
+    .callout-value {
+        display: block;
+        font-size: 15px;
+        font-weight: 700;
+        line-height: 1.45;
+        overflow-wrap: anywhere;
+    }
+
+    .incident-summary {
+        margin: 0 0 15px;
+        padding: 11px 13px;
+        border: 1px solid #dbe3e7;
+        border-radius: 4px;
+        background: #f5f8f9;
+    }
+
+    .incident-summary strong {
+        display: block;
+        margin-bottom: 3px;
+        color: #526170;
+        font-size: 11px;
+    }
+
+    .incident-summary p {
+        margin: 0;
+        color: #273844;
+        font-size: 14px;
+        font-weight: 600;
+        line-height: 1.55;
+    }
+
+    .detail-topline {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 14px;
+        padding-bottom: 13px;
+        border-bottom: 1px solid var(--line);
+    }
+
+    .detail-location {
+        margin: 0;
+        color: #1f303e;
+        font-size: 22px;
+        line-height: 1.3;
+    }
+
+    .detail-landmark {
+        margin: 5px 0 0;
+        color: #526170;
+        font-size: 13px;
+    }
+
+    .detail-actions {
+        display: flex;
+        flex: 0 0 auto;
+        flex-wrap: wrap;
+        gap: 7px;
+    }
+
+    .detail-actions .dashboard-button {
+        min-height: 34px;
+        padding: 0 10px;
+        font-size: 12px;
+    }
+
+    .priority-strip {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 7px;
+        padding: 12px 0;
+    }
+
+    .fact-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 0 18px;
+        border-top: 1px solid var(--line);
+    }
+
+    .fact-item {
+        min-width: 0;
+        padding: 10px 0;
+        border-bottom: 1px solid #e8edf0;
+    }
+
+    .fact-label {
+        display: block;
+        margin-bottom: 3px;
+        color: var(--muted);
+        font-size: 11px;
+        font-weight: 700;
+    }
+
+    .fact-value {
+        color: #263543;
+        font-size: 13px;
+        font-weight: 600;
+        line-height: 1.55;
+        overflow-wrap: anywhere;
+    }
+
+    .detail-sections {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 14px 18px;
+        margin-top: 12px;
+    }
+
+    .detail-section {
+        min-width: 0;
+        padding-top: 10px;
+        border-top: 2px solid #cbd5dc;
+    }
+
+    .detail-section[data-kind="confirmed"] { border-top-color: #3d8061; }
+    .detail-section[data-kind="inference"] { border-top-color: #b5802d; }
+    .detail-section[data-kind="check"] { border-top-color: #73818d; }
+
+    .detail-section h3 {
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        margin: 0 0 7px;
+        color: #334452;
+        font-size: 14px;
+    }
+
+    .detail-section ul {
+        display: grid;
+        gap: 6px;
+        margin: 0;
+        padding-left: 18px;
+        color: #344451;
+        font-size: 13px;
+        line-height: 1.55;
+    }
+
+    .detail-section[data-kind="inference"] ul { color: #77561f; }
+    .detail-section[data-kind="check"] ul { color: #52606b; }
+
+    .evidence-heading {
+        margin: 8px 0 4px;
+        color: #40515e;
+        font-size: 11px;
+        font-weight: 700;
+    }
+
+    .detail-section[data-kind="inference"] .evidence-heading { color: #805b1e; }
+    .detail-section[data-kind="check"] .evidence-heading { color: #596773; }
+
+    .detail-section .empty-evidence {
+        color: #788590;
+        font-style: italic;
+    }
+
+    .related-section,
+    .map-section,
+    .transcript-section {
+        margin-top: 16px;
+        padding-top: 12px;
+        border-top: 1px solid var(--line);
+    }
+
+    .related-section h3,
+    .map-section h3 {
+        margin: 0 0 8px;
+        color: #334452;
+        font-size: 12px;
+    }
+
+    .related-list {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 7px;
+    }
+
+    .related-link {
+        padding: 6px 9px;
+        border: 1px solid #cbd6dc;
+        border-radius: 4px;
+        color: #315653;
+        background: #f7faf9;
+        font: inherit;
+        font-size: 11px;
+        cursor: pointer;
+    }
+
+    .map-placeholder {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        min-height: 76px;
+        padding: 12px;
+        border: 1px dashed #b9c5cd;
+        border-radius: 4px;
+        color: #526170;
+        background: repeating-linear-gradient(135deg, #f8fafb, #f8fafb 8px, #f2f5f6 8px, #f2f5f6 16px);
+        font-size: 12px;
+        line-height: 1.5;
+    }
+
+    .map-placeholder i {
+        color: #768694;
+        font-size: 20px;
+    }
+
+    .transcript-section summary {
+        color: #435361;
+        font-size: 12px;
+        font-weight: 700;
+        cursor: pointer;
+    }
+
+    .source-data {
+        display: grid;
+        gap: 12px;
+        margin-top: 12px;
+    }
+
+    .source-data h4 {
+        margin: 0 0 5px;
+        color: #445461;
+        font-size: 12px;
+    }
+
+    .transcript-text {
+        max-height: 260px;
+        overflow: auto;
+        margin: 10px 0 0;
+        padding: 12px;
+        border-radius: 4px;
+        color: #344451;
+        background: #f4f6f7;
+        font-size: 12px;
+        line-height: 1.7;
+        white-space: pre-wrap;
+        overflow-wrap: anywhere;
+    }
+
+    .detail-empty {
+        display: grid;
+        min-height: 330px;
+        place-items: center;
+        padding: 30px;
+        color: #667582;
+        font-size: 14px;
+        text-align: center;
+    }
+
+    .dashboard-message {
+        min-height: 20px;
+        margin: 8px 0 0;
+        color: #526170;
+        font-size: 12px;
+    }
+
+    @media (max-width: 1120px) {
+        .summary-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+        .filter-bar { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+        .report-layout { grid-template-columns: minmax(290px, .8fr) minmax(0, 1.3fr); }
+    }
+
+    @media (max-width: 760px) {
+        .page-shell:has(.report-dashboard) { width: calc(100% - 24px); padding-top: 16px; }
+        .dashboard-heading { align-items: flex-start; flex-direction: column; gap: 8px; }
+        .dashboard-heading h1 { font-size: 21px; }
+        .summary-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; }
+        .summary-tile { padding: 10px; }
+        .summary-value { font-size: 23px; }
+        .filter-bar { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; padding: 9px; }
+        .filter-field:first-child { grid-column: 1 / -1; }
+        .report-layout { grid-template-columns: minmax(0, 1fr); }
+        .report-list { max-height: 40vh; }
+        .detail-topline { flex-direction: column; }
+        .detail-location { font-size: 20px; }
+        .detail-sections { gap: 12px; }
+        .critical-callouts { grid-template-columns: minmax(0, 1fr); }
+        .intake-form { grid-template-columns: minmax(0, 1fr); }
+        .intake-form .dashboard-button { justify-self: start; }
+    }
+
+    @media (max-width: 420px) {
+        .filter-bar { grid-template-columns: minmax(0, 1fr); }
+        .filter-field:first-child { grid-column: auto; }
+        .filter-check { min-height: 30px; }
+        .fact-grid,
+        .detail-sections { grid-template-columns: minmax(0, 1fr); }
+        .detail-content { padding: 13px; }
+    }
+</style>
+
+<div class="report-dashboard">
+    <header class="dashboard-heading">
+        <div>
+            <h1>災害通報一覧</h1>
+            <p>通報内容を確認し、対応状況を更新します。</p>
+        </div>
+        <span class="feed-status" id="feedStatus">一覧を読み込み中</span>
+    </header>
+
+    <details class="intake-drawer">
+        <summary><i class="fa-solid fa-plus" aria-hidden="true"></i> 新しい通報を登録</summary>
+        <form class="intake-form" id="intakeForm">
+            <div>
+                <label for="transcriptInput">自動文字起こし</label>
+                <textarea id="transcriptInput" placeholder="電話通報の文字起こしを貼り付けてください。"></textarea>
+            </div>
+            <button class="dashboard-button primary" id="registerButton" type="submit"><i class="fa-solid fa-inbox" aria-hidden="true"></i> 通報を登録</button>
+        </form>
+    </details>
+
+    <section class="summary-grid" aria-label="通報状況の集計">
+        <div class="summary-tile"><span class="summary-label">総通報件数</span><strong class="summary-value" id="totalCount">0</strong></div>
+        <div class="summary-tile" data-tone="amber"><span class="summary-label">未確認</span><strong class="summary-value" id="unconfirmedCount">0</strong></div>
+        <div class="summary-tile" data-tone="red"><span class="summary-label">緊急度 高</span><strong class="summary-value" id="urgentCount">0</strong></div>
+        <div class="summary-tile" data-tone="amber"><span class="summary-label">人的被害情報</span><strong class="summary-value" id="humanCount">0</strong></div>
+        <div class="summary-tile" data-tone="red"><span class="summary-label">救助要請</span><strong class="summary-value" id="rescueCount">0</strong></div>
+        <div class="summary-tile" data-tone="teal"><span class="summary-label">関連通報候補</span><strong class="summary-value" id="relatedCount">0</strong></div>
+    </section>
+
+    <section class="filter-bar" aria-label="通報の絞り込み">
+        <div class="filter-field">
+            <label for="keywordFilter">キーワード</label>
+            <input class="filter-control" id="keywordFilter" type="search" placeholder="通報内容・場所を検索">
+        </div>
+        <div class="filter-field">
+            <label for="locationFilter">市町村・地区</label>
+            <input class="filter-control" id="locationFilter" type="search" placeholder="場所で絞り込み">
+        </div>
+        <div class="filter-field">
+            <label for="typeFilter">災害種別</label>
+            <select class="filter-control" id="typeFilter"><option value="">すべて</option></select>
+        </div>
+        <div class="filter-field">
+            <label for="urgencyFilter">緊急度</label>
+            <select class="filter-control" id="urgencyFilter">
+                <option value="">すべて</option><option>高</option><option>中</option><option>低</option><option>要確認</option>
+            </select>
+        </div>
+        <label class="filter-check"><input id="rescueFilter" type="checkbox">救助要請あり</label>
+        <label class="filter-check"><input id="unconfirmedFilter" type="checkbox">未確認のみ</label>
+        <div class="filter-field">
+            <label for="sortOrder">並び替え</label>
+            <select class="filter-control" id="sortOrder">
+                <option value="time">登録時刻順</option><option value="urgency">緊急度順</option>
+            </select>
+        </div>
+    </section>
+    <p class="filter-count" id="filterCount" aria-live="polite">0件を表示</p>
+
+    <div class="report-layout">
+        <section class="list-pane" aria-labelledby="listHeading">
+            <header class="pane-heading"><h2 id="listHeading">通報一覧</h2><small>登録時刻・未確認状態</small></header>
+            <div class="report-list" id="reportList" aria-live="polite"></div>
+        </section>
+
+        <section class="detail-pane" aria-labelledby="detailHeading">
+            <header class="pane-heading"><h2 id="detailHeading">通報詳細</h2><small id="selectedReportId">通報を選択してください</small></header>
+            <div class="detail-content" id="detailContent"><div class="detail-empty">通報を選択すると、場所・被害・確認事項を表示します。</div></div>
+        </section>
+    </div>
+    <p class="dashboard-message" id="dashboardMessage" role="status" aria-live="polite"></p>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const reports = [];
+    let selectedId = null;
+    const elements = {
+        list: document.getElementById('reportList'),
+        detail: document.getElementById('detailContent'),
+        detailId: document.getElementById('selectedReportId'),
+        feed: document.getElementById('feedStatus'),
+        message: document.getElementById('dashboardMessage'),
+        form: document.getElementById('intakeForm'),
+        transcript: document.getElementById('transcriptInput'),
+        register: document.getElementById('registerButton'),
+        filterCount: document.getElementById('filterCount'),
+        keyword: document.getElementById('keywordFilter'),
+        location: document.getElementById('locationFilter'),
+        type: document.getElementById('typeFilter'),
+        urgency: document.getElementById('urgencyFilter'),
+        rescue: document.getElementById('rescueFilter'),
+        unconfirmed: document.getElementById('unconfirmedFilter'),
+        sort: document.getElementById('sortOrder')
+    };
+
+    function fieldsOf(report) {
+        return report.fields || {};
+    }
+
+    function displayType(report) {
+        return (fieldsOf(report)['災害種別'] || '不明').replace('（通報者の申告）', '');
+    }
+
+    function locationOf(report) {
+        return fieldsOf(report)['場所'] || '不明';
+    }
+
+    function groupKey(report) {
+        const place = locationOf(report);
+        const kind = displayType(report);
+        if (place === '不明' || kind === '不明') return '';
+        return `${place}|${kind}`;
+    }
+
+    function relatedReports(report) {
+        const key = groupKey(report);
+        return key ? reports.filter(item => groupKey(item) === key) : [report];
+    }
+
+    function commonConfirmed(report) {
+        const related = relatedReports(report);
+        if (related.length < 2) return [];
+        const own = fieldsOf(report)['確認された内容'] || [];
+        return own.filter(item => related.every(entry =>
+            (fieldsOf(entry)['確認された内容'] || []).includes(item)
+        ));
+    }
+
+    function formatRegistrationTime(report) {
+        const date = new Date(report.created_at);
+        if (Number.isNaN(date.getTime())) return '不明';
+        return new Intl.DateTimeFormat('ja-JP', {
+            month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false
+        }).format(date);
+    }
+
+    function conciseSummary(report) {
+        const confirmed = fieldsOf(report)['確認された内容'] || [];
+        const shortNames = [
+            ['道路が浸水しているとの目視報告', '道路浸水'],
+            ['複数の車が動けなくなっているとの目視報告', '車両複数台が停止'],
+            ['周辺の建物の上部に避難している人がいるとの目視報告', '周辺建物に避難者']
+        ];
+        const facts = confirmed.map(item => {
+            const matched = shortNames.find(pair => item.includes(pair[0]));
+            return matched ? matched[1] : item;
+        });
+        return facts.length ? facts.slice(0, 2).join('・') : '確認できた被害情報なし';
+    }
+
+    function addBadge(parent, label, className, level) {
+        const badge = document.createElement('span');
+        badge.className = className;
+        badge.textContent = label;
+        if (level) badge.dataset.level = level;
+        parent.append(badge);
+        return badge;
+    }
+
+    function groupMap() {
+        const groups = new Map();
+        reports.forEach(report => {
+            const key = groupKey(report);
+            if (!key) return;
+            groups.set(key, (groups.get(key) || 0) + 1);
+        });
+        return groups;
+    }
+
+    function updateSummary() {
+        const groups = groupMap();
+        document.getElementById('totalCount').textContent = reports.length;
+        document.getElementById('unconfirmedCount').textContent = reports.filter(item => item.status !== '確認済み').length;
+        document.getElementById('urgentCount').textContent = reports.filter(item => item.urgency === '高').length;
+        document.getElementById('humanCount').textContent = reports.filter(item => fieldsOf(item)['人的被害'] && fieldsOf(item)['人的被害'] !== '不明').length;
+        document.getElementById('rescueCount').textContent = reports.filter(item => fieldsOf(item)['救助要請'] === 'あり').length;
+        document.getElementById('relatedCount').textContent = [...groups.values()].filter(count => count > 1).length;
+    }
+
+    function updateTypeOptions() {
+        const previous = elements.type.value;
+        elements.type.replaceChildren(new Option('すべて', ''));
+        const types = [...new Set(reports.map(displayType).filter(type => type !== '不明'))].sort();
+        types.forEach(type => elements.type.add(new Option(type, type)));
+        if (types.includes(previous)) elements.type.value = previous;
+    }
+
+    function filteredReports() {
+        const keyword = elements.keyword.value.trim().toLocaleLowerCase();
+        const place = elements.location.value.trim().toLocaleLowerCase();
+        const selectedType = elements.type.value;
+        const selectedUrgency = elements.urgency.value;
+        const visible = reports.filter(report => {
+            const fields = fieldsOf(report);
+            if (keyword && !`${JSON.stringify(fields)} ${report.transcript || ''}`.toLocaleLowerCase().includes(keyword)) return false;
+            if (place && !locationOf(report).toLocaleLowerCase().includes(place)) return false;
+            if (selectedType && displayType(report) !== selectedType) return false;
+            if (selectedUrgency && report.urgency !== selectedUrgency) return false;
+            if (elements.rescue.checked && fields['救助要請'] !== 'あり') return false;
+            if (elements.unconfirmed.checked && report.status === '確認済み') return false;
+            return true;
+        });
+        const urgencyOrder = { '高': 0, '中': 1, '低': 2, '要確認': 3 };
+        visible.sort((left, right) => elements.sort.value === 'urgency'
+            ? (urgencyOrder[left.urgency] ?? 4) - (urgencyOrder[right.urgency] ?? 4) || right.created_at.localeCompare(left.created_at)
+            : right.created_at.localeCompare(left.created_at));
+        return visible;
+    }
+
+    function renderList(visible) {
+        elements.list.replaceChildren();
+        elements.filterCount.textContent = `${visible.length}件を表示 / 全${reports.length}件`;
+        if (!visible.length) {
+            const empty = document.createElement('p');
+            empty.className = 'empty-list';
+            empty.textContent = reports.length ? '条件に一致する通報はありません。' : '通報はまだ登録されていません。';
+            elements.list.append(empty);
+            return;
+        }
+
+        const groups = groupMap();
+        visible.forEach(report => {
+            const row = document.createElement('button');
+            row.type = 'button';
+            row.className = 'report-row';
+            row.setAttribute('aria-pressed', String(report.id === selectedId));
+
+            const top = document.createElement('div');
+            top.className = 'row-topline';
+            const time = document.createElement('time');
+            time.className = 'row-time';
+            time.dateTime = report.created_at || '';
+            time.textContent = `登録 ${formatRegistrationTime(report)}`;
+            top.append(time);
+            addBadge(top, report.urgency || '要確認', 'urgency-badge', report.urgency || '要確認');
+
+            const location = document.createElement('strong');
+            location.className = 'row-location';
+            location.textContent = locationOf(report);
+            const kind = document.createElement('p');
+            kind.className = 'row-summary';
+            kind.textContent = `${displayType(report)}｜${conciseSummary(report)}`;
+            const badges = document.createElement('div');
+            badges.className = 'row-badges';
+            addBadge(badges, report.status || '未確認', 'status-badge');
+            const rescue = fieldsOf(report)['救助要請'] === 'あり';
+            addBadge(badges, rescue ? '救助要請あり' : '救助要請記録なし', 'rescue-badge', null).dataset.active = String(rescue);
+            const count = groups.get(groupKey(report)) || 0;
+            if (count > 1) addBadge(badges, `関連通報 ${count}件`, 'related-badge');
+
+            row.append(top, location, kind, badges);
+            row.addEventListener('click', function() {
+                selectedId = report.id;
+                renderDashboard();
+            });
+            elements.list.append(row);
+        });
+    }
+
+    function appendFact(parent, label, value) {
+        const item = document.createElement('div');
+        item.className = 'fact-item';
+        const name = document.createElement('span');
+        name.className = 'fact-label';
+        name.textContent = label;
+        const content = document.createElement('div');
+        content.className = 'fact-value';
+        content.textContent = value || '不明';
+        item.append(name, content);
+        parent.append(item);
+    }
+
+    function appendSection(parent, title, items, kind) {
+        const section = document.createElement('section');
+        section.className = 'detail-section';
+        section.dataset.kind = kind;
+        const heading = document.createElement('h3');
+        heading.textContent = title;
+        section.append(heading);
+        const confidenceLabels = {
+            confirmed: '✓ 確認された情報',
+            inference: '△ 通報者による推測',
+            check: '？ 不明・要確認'
+        };
+        if (confidenceLabels[kind]) {
+            const confidence = document.createElement('p');
+            confidence.className = 'evidence-heading';
+            confidence.textContent = confidenceLabels[kind];
+            section.append(confidence);
+        }
+        const list = document.createElement('ul');
+        (items || []).forEach(value => {
+            const item = document.createElement('li');
+            item.textContent = value;
+            list.append(item);
+        });
+        if (list.childElementCount) {
+            section.append(list);
+        } else {
+            const empty = document.createElement('p');
+            empty.className = 'empty-evidence';
+            empty.textContent = '該当する情報なし';
+            section.append(empty);
+        }
+        parent.append(section);
+    }
+
+    function shortConfirmed(item) {
+        if (item.includes('道路が浸水')) return '道路まで浸水';
+        if (item.includes('車') && item.includes('動けなく')) return '複数の車両が停止';
+        if (item.includes('建物の上部') || item.includes('屋根')) return '周辺建物の上部に避難者';
+        return item.replace('との目視報告', '').replace('との報告', '');
+    }
+
+    function shortUnknown(item) {
+        if (item.includes('通報日時')) return '通報日時';
+        if (item.includes('負傷') || item.includes('けが') || item.includes('怪我')) return '負傷者の有無';
+        if (item.includes('人数')) return '正確な人数';
+        if (item.includes('水位') || item.includes('浸水深')) return '正確な浸水深';
+        return item.replace(/（.*?）/g, '').trim();
+    }
+
+    function conciseInference(item) {
+        if (item.includes('車') && item.includes('可能性')) return '車が流されている可能性あり';
+        if (item.includes('水位') && item.includes('上が')) return '水位上昇の可能性';
+        return item.replace('との通報者の推測', '').replace('との発言', '').trim();
+    }
+
+    function shortDepth(item) {
+        return item.replace('との目視報告', '').replace('。正確な水深は不明', '').trim();
+    }
+
+    function renderDetails(report) {
+        elements.detail.replaceChildren();
+        if (!report) {
+            elements.detailId.textContent = '通報を選択してください';
+            const empty = document.createElement('div');
+            empty.className = 'detail-empty';
+            empty.textContent = '通報を選択すると、場所・被害・確認事項を表示します。';
+            elements.detail.append(empty);
+            return;
+        }
+
+        const fields = fieldsOf(report);
+        elements.detailId.textContent = `ID ${report.id}`;
+
+        const locationParts = (fields['場所'] || '').split('、');
+        const mainLocation = locationParts.slice(0, 2).filter(Boolean).join(' ') || '場所 要確認';
+        const landmarkText = locationParts.slice(2).join('、').replace('（詳細位置不明）', '').trim();
+        const rescueValue = fields['救助要請'] || '';
+        const rescueRequested = rescueValue === 'あり';
+        const rescueKnownAbsent = rescueValue.startsWith('なし');
+        const humanValue = fields['人的被害'] || '';
+        const peopleValue = fields['人数'] || '';
+        const humanReported = (humanValue && humanValue !== '不明') || (peopleValue && peopleValue !== '不明');
+        const injuryNeedsReview = !humanReported || /不明|確認/.test(humanValue);
+
+        const header = document.createElement('div');
+        header.className = 'detail-topline';
+        const titleBlock = document.createElement('div');
+        const title = document.createElement('h2');
+        title.className = 'detail-hazard';
+        title.textContent = displayType(report);
+        const place = document.createElement('p');
+        place.className = 'detail-place';
+        place.textContent = mainLocation;
+        titleBlock.append(title, place);
+        if (landmarkText) {
+            const landmark = document.createElement('p');
+            landmark.className = 'detail-landmark';
+            landmark.textContent = landmarkText;
+            titleBlock.append(landmark);
+        }
+
+        const actions = document.createElement('div');
+        actions.className = 'detail-actions';
+        const statusButton = document.createElement('button');
+        statusButton.type = 'button';
+        statusButton.className = 'dashboard-button';
+        statusButton.textContent = report.status === '確認済み' ? '未確認に戻す' : '確認済みにする';
+        statusButton.addEventListener('click', () => updateStatus(report));
+        actions.append(statusButton);
+        header.append(titleBlock, actions);
+        elements.detail.append(header);
+
+        const priority = document.createElement('div');
+        priority.className = 'priority-strip';
+        addBadge(priority, `${report.urgency || '要確認'} 緊急度`, 'urgency-badge', report.urgency || '要確認');
+        addBadge(priority, report.status || '未確認', 'status-badge');
+        elements.detail.append(priority);
+
+        const callouts = document.createElement('div');
+        callouts.className = 'critical-callouts';
+        const rescueCallout = document.createElement('div');
+        rescueCallout.className = 'critical-callout';
+        rescueCallout.dataset.alert = String(rescueRequested);
+        rescueCallout.dataset.review = String(!rescueRequested && !rescueKnownAbsent);
+        const rescueLabel = document.createElement('span');
+        rescueLabel.className = 'callout-label';
+        rescueLabel.textContent = '救助要請';
+        const rescueText = document.createElement('strong');
+        rescueText.className = 'callout-value';
+        rescueText.textContent = rescueRequested ? 'あり' : rescueKnownAbsent ? 'なし' : '要確認';
+        rescueCallout.append(rescueLabel, rescueText);
+
+        const peopleCallout = document.createElement('div');
+        peopleCallout.className = 'critical-callout';
+        peopleCallout.dataset.alert = String(Boolean(humanReported && injuryNeedsReview));
+        peopleCallout.dataset.review = String(!humanReported);
+        const peopleLabel = document.createElement('span');
+        peopleLabel.className = 'callout-label';
+        peopleLabel.textContent = '人的被害';
+        const peopleText = document.createElement('strong');
+        peopleText.className = 'callout-value';
+        peopleText.textContent = humanReported
+            ? `${peopleValue && peopleValue !== '不明' ? '情報あり' : '報告あり'} / 負傷は要確認`
+            : '要確認';
+        peopleCallout.append(peopleLabel, peopleText);
+        callouts.append(rescueCallout, peopleCallout);
+        elements.detail.append(callouts);
+
+        const summary = document.createElement('div');
+        summary.className = 'incident-summary';
+        const summaryLabel = document.createElement('strong');
+        summaryLabel.textContent = '通報概要';
+        const summaryText = document.createElement('p');
+        const summaryParts = [];
+        const current = fields['発生・確認状況'] || '';
+        if (current && current !== '不明') {
+            summaryParts.push(current.replace('との報告', '').replace('との発言', ''));
+        }
+        if (humanReported) summaryParts.push('人的状況の詳細確認が必要');
+        if (!summaryParts.length) summaryParts.push('内容の確認が必要');
+        summaryText.textContent = summaryParts.join('。') + '。';
+        summary.append(summaryLabel, summaryText);
+        elements.detail.append(summary);
+
+        const sections = document.createElement('div');
+        sections.className = 'detail-sections';
+
+        const peopleConfirmations = (fields['確認された内容'] || []).filter(item => item.includes('人') || item.includes('屋根'));
+        const hazardConfirmations = (fields['確認された内容'] || []).filter(item => !peopleConfirmations.includes(item));
+        const hazardItems = hazardConfirmations.map(shortConfirmed);
+        if (fields['水位・浸水深等'] && fields['水位・浸水深等'] !== '不明') {
+            hazardItems.push(`浸水の目安: ${shortDepth(fields['水位・浸水深等'])}`);
+        }
+        appendSection(sections, '災害状況', [...new Set(hazardItems)], 'confirmed');
+
+        const humanItems = peopleConfirmations.map(item => `✓ ${shortConfirmed(item)}`);
+        if (peopleValue && peopleValue !== '不明') {
+            humanItems.push(`人数: ${peopleValue.replace(/（.*?）/g, '').trim()}`);
+        }
+        if (injuryNeedsReview) humanItems.push('？ 負傷者の有無');
+        else if (humanReported) humanItems.push('✓ 負傷情報あり');
+        if (!humanItems.length) humanItems.push('？ 人的状況を確認');
+        appendSection(sections, '人的状況', humanItems, 'mixed');
+
+        const callerItems = [];
+        if (fields['通報者の現在地'] && fields['通報者の現在地'] !== '不明') callerItems.push(`現在地: ${fields['通報者の現在地']}`);
+        const safety = fields['通報者の安全状況'] || '';
+        callerItems.push(safety && safety !== '不明' && !safety.includes('明言はなし')
+            ? `✓ ${safety}` : '？ 安全状況');
+        if (fields['避難状況'] && fields['避難状況'] !== '不明') callerItems.push(`避難: ${fields['避難状況']}`);
+        appendSection(sections, '通報者の状況', callerItems, 'mixed');
+
+        const inferences = (fields['通報者による推測'] || []).map(conciseInference);
+        appendSection(sections, '推測情報', inferences, 'inference');
+
+        const unknownItems = (fields['不明・要確認'] || []).map(shortUnknown);
+        if (!fields['通報日時'] || fields['通報日時'] === '不明') unknownItems.push('通報日時');
+        if (injuryNeedsReview) unknownItems.push('負傷者の有無');
+        if ((fields['人数'] || '').includes('不明')) unknownItems.push('正確な人数');
+        if (!rescueRequested && !rescueKnownAbsent) unknownItems.push('救助要請の有無');
+        if (!fields['場所'] || fields['場所'] === '不明') unknownItems.push('場所');
+        if ((fields['場所'] || '').includes('詳細位置不明')) unknownItems.push('詳細位置');
+        const uniqueUnknowns = [...new Set(unknownItems)].filter(Boolean);
+        appendSection(sections, '不明・要確認情報', uniqueUnknowns, 'check');
+        elements.detail.append(sections);
+
+        const related = relatedReports(report);
+        if (related.length > 1) {
+            const relationSection = document.createElement('section');
+            relationSection.className = 'related-section';
+            const relationTitle = document.createElement('h3');
+            relationTitle.textContent = `関連通報 ${related.length}件`;
+            const common = commonConfirmed(report);
+            if (common.length) {
+                const confirmedLabel = document.createElement('p');
+                confirmedLabel.className = 'related-badge';
+                confirmedLabel.textContent = `複数通報で確認: ${common.join('、')}`;
+                relationSection.append(relationTitle, confirmedLabel);
+            } else {
+                relationSection.append(relationTitle);
+            }
+            const links = document.createElement('div');
+            links.className = 'related-list';
+            related.filter(item => item.id !== report.id).forEach(item => {
+                const link = document.createElement('button');
+                link.type = 'button';
+                link.className = 'related-link';
+                link.textContent = `${formatRegistrationTime(item)} 登録・${item.status || '未確認'}`;
+                link.addEventListener('click', () => {
+                    selectedId = item.id;
+                    renderDashboard();
+                });
+                links.append(link);
+            });
+            relationSection.append(links);
+            elements.detail.append(relationSection);
+        }
+
+        const mapSection = document.createElement('section');
+        mapSection.className = 'map-section';
+        const mapHeading = document.createElement('h3');
+        mapHeading.textContent = '地図';
+        const mapPlaceholder = document.createElement('div');
+        mapPlaceholder.className = 'map-placeholder';
+        const mapIcon = document.createElement('i');
+        mapIcon.className = 'fa-regular fa-map';
+        mapIcon.setAttribute('aria-hidden', 'true');
+        const mapText = document.createElement('span');
+        mapText.textContent = '通報に位置座標が含まれていないため、地図上の位置は表示していません。場所を推測してピンを置くことは避けています。';
+        mapPlaceholder.append(mapIcon, mapText);
+        mapSection.append(mapHeading, mapPlaceholder);
+        elements.detail.append(mapSection);
+
+        const sourceDetails = document.createElement('details');
+        sourceDetails.className = 'transcript-section';
+        const sourceHeading = document.createElement('summary');
+        sourceHeading.textContent = '詳細を表示';
+        const sourceData = document.createElement('div');
+        sourceData.className = 'source-data';
+        const jsonDetails = document.createElement('details');
+        const jsonHeading = document.createElement('summary');
+        jsonHeading.textContent = '抽出JSON';
+        const jsonText = document.createElement('pre');
+        jsonText.className = 'transcript-text';
+        jsonText.textContent = JSON.stringify(fields, null, 2);
+        jsonDetails.append(jsonHeading, jsonText);
+        const transcriptDetails = document.createElement('details');
+        const transcriptHeading = document.createElement('summary');
+        transcriptHeading.textContent = '元の文字起こし';
+        const transcriptText = document.createElement('pre');
+        transcriptText.className = 'transcript-text';
+        transcriptText.textContent = report.transcript || '文字起こしなし';
+        transcriptDetails.append(transcriptHeading, transcriptText);
+        sourceData.append(jsonDetails, transcriptDetails);
+        sourceDetails.append(sourceHeading, sourceData);
+        elements.detail.append(sourceDetails);
+    }
+
+    function renderDashboard() {
+        updateSummary();
+        updateTypeOptions();
+        const visible = filteredReports();
+        if (!visible.some(item => item.id === selectedId)) selectedId = visible[0] ? visible[0].id : null;
+        renderList(visible);
+        renderDetails(reports.find(item => item.id === selectedId));
+    }
+
+    async function loadReports(preferredId) {
+        elements.feed.textContent = '一覧を更新中';
+        try {
+            const response = await fetch('/api/reports', { cache: 'no-store' });
+            if (!response.ok) throw new Error('通報一覧を取得できませんでした。');
+            const data = await response.json();
+            reports.splice(0, reports.length, ...data);
+            if (preferredId) selectedId = preferredId;
+            elements.feed.textContent = `最終更新 ${new Intl.DateTimeFormat('ja-JP', { hour: '2-digit', minute: '2-digit', hour12: false }).format(new Date())}`;
+            renderDashboard();
+        } catch (error) {
+            elements.feed.textContent = '一覧を取得できません';
+            elements.message.textContent = error.message;
+        }
+    }
+
+    async function updateStatus(report) {
+        const status = report.status === '確認済み' ? '未確認' : '確認済み';
+        try {
+            const response = await fetch(`/api/reports/${encodeURIComponent(report.id)}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ status: status })
+            });
+            const updated = await response.json();
+            if (!response.ok) throw new Error(updated.error || '状態を更新できませんでした。');
+            const index = reports.findIndex(item => item.id === updated.id);
+            if (index >= 0) reports[index] = updated;
+            elements.message.textContent = `通報を「${status}」に更新しました。`;
+            renderDashboard();
+        } catch (error) {
+            elements.message.textContent = error.message;
+        }
+    }
+
+    elements.form.addEventListener('submit', async function(event) {
+        event.preventDefault();
+        const transcript = elements.transcript.value.trim();
+        if (!transcript) {
+            elements.message.textContent = '文字起こしを入力してください。';
+            elements.transcript.focus();
+            return;
+        }
+        elements.register.disabled = true;
+        elements.message.textContent = '通報を登録しています...';
+        try {
+            const response = await fetch('/api/reports', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ transcript: transcript })
+            });
+            const report = await response.json();
+            if (!response.ok) throw new Error(report.error || '通報を登録できませんでした。');
+            elements.transcript.value = '';
+            elements.form.closest('details').open = false;
+            elements.message.textContent = '通報を登録しました。抽出結果と緊急度を確認してください。';
+            await loadReports(report.id);
+        } catch (error) {
+            elements.message.textContent = error.message;
+        } finally {
+            elements.register.disabled = false;
+        }
+    });
+
+    [elements.keyword, elements.location, elements.type, elements.urgency, elements.rescue, elements.unconfirmed, elements.sort]
+        .forEach(control => control.addEventListener('input', renderDashboard));
+    [elements.type, elements.urgency, elements.sort].forEach(control => control.addEventListener('change', renderDashboard));
+
+    loadReports();
+});
+</script>
+{% endblock %}
